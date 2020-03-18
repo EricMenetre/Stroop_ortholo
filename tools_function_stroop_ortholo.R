@@ -6,6 +6,11 @@
 library(readxl)
 library(tidyverse)
 library(stringr)
+library(lme4)
+library(lmerTest)
+library(optimx)
+library(simr)
+
 
 # Data importation
 
