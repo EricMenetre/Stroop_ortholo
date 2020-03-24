@@ -1,0 +1,168 @@
+---
+title: "Résultats Stroop longueur orthographique"
+author: "Eric Ménétré"
+date: "23/03/2020"
+output: html_document
+---
+
+```{r include =FALSE}
+library(readxl)
+library(tidyverse)
+library(stringr)
+library(lme4)
+library(lmerTest)
+library(optimx)
+library(simr)
+library(readxl)
+library(knitr)
+data_ortholo <- read_excel("C:/Users/EricM/ownCloud/UNIGE/DOCTORAT/THESE/ETUDE 5_Stroop longueur ortho/dev/results/Stroop_ortholo/data_ortholo_cleaned.xlsx")
+
+# Graphs and descriptive statistics
+
+
+boxplot <- data_ortholo%>%
+  ggplot(aes(x = condition, y = RT_clean)) + geom_boxplot()
+
+m0 <- lmer(RT_clean ~ condition + (1|subject) + (1|repcor), data = data_ortholo, REML = T, control = lmerControl(optimizer = "optimx", calc.derivs = FALSE,
+                                                                                                                 optCtrl = list(method = "nlminb", starttests = FALSE, kkt = FALSE)))
+summary(m0) # conditionincong   16.372      5.455 2174.256   3.001  0.00272
+
+
+```
+
+
+
+## Introduction
+
+#### Question de recherche
+
+la forme orthographique du mot est-elle activée lors de la dénomination de couleur ? Est-il possible d'inférer un effet d'interférence à ce niveau ?
+
+#### Manipulation
+
+Dénomination de couleur sur base de présentations de rangées de X écrits en différentes couleurs. La manipulation touche la longueur de la rangée de X. Le nombre de X peut soit correspondre au nombre de caractères contenus dans le mot de couleur ou non. Deux conditions s'opposent :
+
+- Même nombre de X que le nom de la couleur contient de caractères -> pas d'interférence (ligne de base)
+- Nombre plus petit ou plus grands de X que le nom de la couleur contient de caractères -> condition interférente
+
+#### Stimuli
+
+4 couleurs choisies :
+
+- Or
+- Azur
+- Turquoise
+- Bordeau
+
+#### Procédure
+
+Les participants sont informés qu'ils vont devoir dénommer en quelle couleurs des rangées de X sont écrites, mais qu'étant donné le fait que les couleurs à dénommer sont peu fréquentes, ils devront effectuer deux étapes d'entrainement.
+
+Dans un premier temps, les rangées de X en différentes couleurs ainsi qu'un enregistrement d'une personne dénommant cette couleur leur est proposé trois fois par couleur. Les rangées de X sont toujours congruentes.
+
+Dans un second temps, les rangées de X leur sont présenté et leur tâche est d'indiquer à l'aide du clavier (touches de 1 à 4) de quelle couleur est la rangée  de X présentée. Tous les participants (en tout cas jusque là ont obtenu un taux de réussite supérieur à 80%).
+
+Enfin, les sujets dénomment oralement 92 items de chaque condition. La randomisation a été effectuée par Mix et un algorithme de machine learning (KNN) a montré que les données étaient difficilement prédictibles.
+
+# Résultats
+
+#### Statstiques descriptives
+
+Les données ont été nettoyées au préalable (2.5 SD au dessus et en dessous de la moyenne)
+
+```{r echo=FALSE, warning=FALSE}
+
+descr_stats <- data_ortholo%>%
+  mutate(accuracy_large = case_when(error_type == "W" | error_type == "Wrcor"| error_type == "NR" ~ 0,
+                                    TRUE ~ 1))%>%
+  group_by(condition)%>%
+  summarise(mean_RT = mean(RT_clean, na.rm = T),
+            SD_RT = sd(RT_clean, na.rm = T),
+            accuracy_res = mean(accuracy, na.rm = T),
+            SD_acc_res = sd(accuracy, na.rm = T),
+            accuracy_large_res = mean(accuracy_large, na.rm = T),
+            SD_acc_large =  sd(accuracy_large_res, na.rm = T))
+
+as.data.frame(descr_stats)
+
+
+
+boxplot
+
+
+
+
+```
+
+Il y a donc une différence de `r as.numeric(descr_stats[2,2]) - as.numeric(descr_stats[1,2])`ms.
+
+
+#### Modèles mixtes
+
+Evaluation des postulats du modèle:
+
+```{r}
+m0 <- lmer(RT_clean ~ 1 + (1|subject) + (1|repcor), data = data_ortholo, REML = T)
+summary(m0)
+hist(ranef(m0)$subject[,1])
+hist(ranef(m0)$repcor[,1])
+res0 <- residuals(m0)
+qqnorm(res0) ; qqline(res0)
+pred0 <- fitted(m0)
+plot(pred0)
+rand(m0)
+
+ICC_subj <- round((3189 / (3189 + 982.8 + 16323.4))*100,2)
+ICC_item <- round((982.8 / (3189 + 982.8 + 16323.4))*100,2)
+
+
+```
+
+Les postulats sont respectés. La VD est normalement distribuée, les résidus du modèle sont normalement distribués, la distribution autour de chaque intercept aléatoire est normale également et les deux effets aléatoire améliorent significativement l'explication de la variance résiduelle. En effet, en placant sujet comme variable aléatoire, `r ICC_subj`% de la variance des données est expliquée alors que seuls `r ICC_item`% de la variance totale sont expliqués par les différentes couleurs.
+
+
+Le modèle complet ne convergeait pas. C'est pourquoi l'optimisateur a été changé pour "nlminb"
+
+```{r}
+
+data_ortholo$subject <- factor(data_ortholo$subject)
+data_ortholo$condition <- factor(data_ortholo$condition)
+data_ortholo$condition <- as.numeric(data_ortholo$condition)
+data_ortholo$repcor <- factor(data_ortholo$repcor)
+data_ortholo$repcor <- as.numeric(data_ortholo$repcor)
+
+m1 <- lmer(RT_clean ~ condition + (1|subject) + (1|repcor), data = data_ortholo, REML = T, control = lmerControl(optimizer = "optimx", calc.derivs = FALSE,
+                                                                                                                 optCtrl = list(method = "nlminb", starttests = FALSE, kkt = FALSE)))
+
+summary(m1) 
+```
+
+
+Les résultats montrent un effet significatif de conditions (disparaissant avec l'ajout de condition comme pente aléatoire, probablement par manque de sujets).
+
+#### Analyses de puissances 
+
+Afin d'obtenir la bonne puissance (éviter d'avoir une étude overpowered ou underpowered), utilisation du package simr pour définir les bons paramètres. 
+
+```{r include=FALSE}
+set.seed(123)
+power <- powerSim(m1, nsim = 50)
+
+pc <- powerCurve(m1, along = "subject_num", nsim = 50)
+
+```
+
+```{r echo=FALSE}
+power
+plot(pc)
+```
+
+Les résultats de la simulation montrent que 10 sujets sont nécessaires pour atteindre une puissance de 80%. Aussi, avec ce modèle la puissance observée est de 80%. Pour cette étude, il ne faut donc pas dépasser 15 sujets.
+
+# Conclusion
+
+Il seblerait qu'un effet d'interférence existe lié au décodage de la forme orthographique même quand celle-ci n'est pas requise. Ces résultats (s'ils se confirment avec davantage de données), mènent à deux conclusions principales. 
+
+1. Si un effet d'interférence est retrouvé, cela suppose qu'un mécanisme lié au décodage orthographique (lequel?) est sous contrôle attentionnel
+
+2. Si un effet d'interférence est présent, ceci remet en cause les modèles strictement sériels tels que le modèle de Levelt et favorise les modèles interactionnistes. Jusque-là (à vérifier) les travaux sur les interactions entre les niveaux théorique du modèle de production ainsi que le modèle de compréhension se sont penchées sur d'éventuelles contamination des autres modules de la production ou de la compréhension mais les interactions entre production et compréhension ne sont que rarement prises en compte, hors des tâches largement utilisées telles que la dénomination d'image ou le PWI devraient selon toute vraisemblance activer le système de compréhension également.
