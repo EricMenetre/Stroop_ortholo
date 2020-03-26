@@ -27,6 +27,21 @@ m0 <- lmer(RT_clean ~ condition + (1|subject) + (1|repcor), data = data_ortholo,
                                                                                                                  optCtrl = list(method = "nlminb", starttests = FALSE, kkt = FALSE)))
 summary(m0) # conditionincong   16.372      5.455 2174.256   3.001  0.00272
 
+temp <- data_ortholo%>%
+  group_by(subject, condition)%>%
+  summarise(mean_RT = mean(RT_clean, na.rm = T))%>%
+  spread(condition, mean_RT)%>%
+  mutate(interf_mean = incong-cong)
+
+temp_2 <- data_ortholo%>%
+  group_by(subject, condition)%>%
+  summarise(SD_RT = sd(RT_clean, na.rm = T))%>%
+  spread(condition, SD_RT)%>%
+  mutate(interf_SD = incong-cong)
+
+interf_suj <- data.frame(temp$subject, temp$interf_mean, temp_2$interf_SD)
+p_interf_suj <- interf_suj%>%
+  ggplot(aes(x = temp.subject, y = temp.interf_mean)) + geom_errorbar(aes(ymin = temp.interf_mean - temp_2.interf_SD, ymax = temp.interf_mean + temp_2.interf_SD), col = "gray40", width = 0.5) + geom_point(size = 3) + geom_hline(yintercept = 0) + theme_minimal() + labs(x= "Subjects", y = "Incongruent RT - Congruent RT")
 
 ```
 
@@ -89,7 +104,7 @@ as.data.frame(descr_stats)
 
 boxplot
 
-
+p_interf_suj
 
 
 ```
