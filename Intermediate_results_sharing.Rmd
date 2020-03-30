@@ -111,6 +111,40 @@ p_interf_suj
 
 Il y a donc une différence de `r as.numeric(descr_stats[2,2]) - as.numeric(descr_stats[1,2])`ms.
 
+Qu'en est-il de l'effet par couleur ?
+
+```{r}
+data_ortholo%>%
+  rename(color = repcor)%>%
+  group_by(color, condition)%>%
+  summarize(MEAN = mean(RT_clean, na.rm = T))%>%
+  spread(condition, MEAN)%>%
+  mutate(interference = incong-cong)%>%
+  rename(congruent = cong,
+         incongruent = incong)
+
+```
+
+Y a-t-il un effet d'apprentissage au cours de la tâche ? 
+
+```{r message=FALSE, warning=FALSE}
+data_ortholo%>%
+  group_by(order, condition)%>%
+  summarize(RT_mean = mean(RT_clean, na.rm = T),
+            RT_SD = sd(RT_clean, na.rm = T))%>%
+  ggplot(aes(x = order, y = RT_mean, color = condition)) + geom_point()+
+  geom_smooth(method = "lm", se = F) + theme_minimal()+
+  labs(x = "Presentation order",
+       y = "RT in ms")
+         
+  
+  
+  
+```
+
+Afin de vérifier que nous n'ayons pas un effet de priming dû au fait que durant l'entrainement les items sont tous présentés de manière congruente, si un effet de priming a bien eu lieu, au cours des essais, il devrait diminuer. On devrait donc retrouver un effet d'interférence minimal au début de la tâche puis le voir augmenter à nouveau vers la fin. Ici nous observond l'inverse, indiquant plus un effet de fatigue qu'un effet de priming. Fait intéressant, l'effet de fatigue semble plus toucher la condition congruente qu'incongruente, pouvant être interprété comme une charge attentionnelle nécessaire pour l'incongruence supérieureà celle nécessaire pour traiter un item congruent.
+
+
 
 #### Modèles mixtes
 
@@ -146,10 +180,17 @@ data_ortholo$condition <- as.numeric(data_ortholo$condition)
 data_ortholo$repcor <- factor(data_ortholo$repcor)
 data_ortholo$repcor <- as.numeric(data_ortholo$repcor)
 
-m1 <- lmer(RT_clean ~ condition + (1|subject) + (1|repcor), data = data_ortholo, REML = T, control = lmerControl(optimizer = "optimx", calc.derivs = FALSE,
-                                                                                                                 optCtrl = list(method = "nlminb", starttests = FALSE, kkt = FALSE)))
 
+m1 <- lmer(RT_clean ~ 1 + (1|subject), data = data_ortholo, REML = F)
+anova(m0,m1)
+m2 <- lmer(RT_clean ~ 1 + (1|subject) + (1|repcor), data = data_ortholo, REML = F)
+anova(m1, m2)
+m3 <-lmer(RT_clean ~ condition + (1|subject) + (1|repcor), data = data_ortholo, REML = T, control = lmerControl(optimizer = "optimx", calc.derivs = FALSE,
+                                                                                                                 optCtrl = list(method = "nlminb", starttests = FALSE, kkt = FALSE)))
+anova(m2,m3)
 summary(m1) 
+
+
 ```
 
 
@@ -161,9 +202,9 @@ Afin d'obtenir la bonne puissance (éviter d'avoir une étude overpowered ou und
 
 ```{r include=FALSE}
 set.seed(123)
-power <- powerSim(m1, nsim = 50)
+power <- powerSim(m3, nsim = 50)
 
-pc <- powerCurve(m1, along = "subject_num", nsim = 50)
+pc <- powerCurve(m3, along = "subject_num", nsim = 50)
 
 ```
 
